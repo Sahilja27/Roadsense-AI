@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: roadsense-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: roadsense_admin
+      POSTGRES_PASSWORD: roadsense_secure_password_2026
+      POSTGRES_DB: roadsense_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U roadsense_admin -d roadsense_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: roadsense-backend
+    restart: always
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://roadsense_admin:roadsense_secure_password_2026@db:5432/roadsense_db
+      - SECRET_KEY=roadsense_production_secret_key_change_me
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: roadsense-dashboard
+    restart: always
+    environment:
+      - ROADSENSE_API_URL=http://backend:8000/api
+    ports:
+      - "8501:8501"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
